@@ -14,6 +14,10 @@ import java.util.List;
  * file has a unique id used to store metadata about the table in the Catalog.
  * DbFiles are generally accessed through the buffer pool, rather than directly
  * by operators.
+ *
+ * 一个表的操作接口,
+ * 从disk读入数据到bf,把脏页刷回disk
+ * 插入元组,删除元组,或缺所有页列表,获取所有记录的迭代器,以及该表的描述
  */
 public interface DbFile {
     /**
@@ -72,6 +76,7 @@ public interface DbFile {
     DbFileIterator iterator(TransactionId tid);
 
     /**
+     * 在catalog中使用的id
      * Returns a unique ID used to identify this DbFile in the Catalog. This id
      * can be used to look up the table via {@link Catalog#getDatabaseFile} and
      * {@link Catalog#getTupleDesc}.

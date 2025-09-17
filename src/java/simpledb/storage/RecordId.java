@@ -1,10 +1,13 @@
 package simpledb.storage;
 
 import java.io.Serializable;
+import java.util.Objects;
 
 /**
  * A RecordId is a reference to a specific tuple on a specific page of a
  * specific table.
+ * 在物理即页的层面定位一条记录
+ * 主键是在一个确定的表内定位一条记录
  */
 public class RecordId implements Serializable {
 
@@ -13,12 +16,14 @@ public class RecordId implements Serializable {
     /**
      * Creates a new RecordId referring to the specified PageId and tuple
      * number.
-     *
-     * @param pid     the pageid of the page on which the tuple resides
-     * @param tupleno the tuple number within the page.
+
      */
+    PageId pageId;
+    int tupleNo;
     public RecordId(PageId pid, int tupleno) {
         // TODO: some code goes here
+        this.pageId=pid;
+        this.tupleNo=tupleno;
     }
 
     /**
@@ -26,7 +31,7 @@ public class RecordId implements Serializable {
      */
     public int getTupleNumber() {
         // TODO: some code goes here
-        return 0;
+        return tupleNo;
     }
 
     /**
@@ -34,32 +39,18 @@ public class RecordId implements Serializable {
      */
     public PageId getPageId() {
         // TODO: some code goes here
-        return null;
+        return pageId;
     }
 
-    /**
-     * Two RecordId objects are considered equal if they represent the same
-     * tuple.
-     *
-     * @return True if this and o represent the same tuple
-     */
     @Override
     public boolean equals(Object o) {
-        // TODO: some code goes here
-        throw new UnsupportedOperationException("implement this");
+        if (o == null || getClass() != o.getClass()) return false;
+        RecordId recordId = (RecordId) o;
+        return tupleNo == recordId.tupleNo && Objects.equals(pageId, recordId.pageId);
     }
 
-    /**
-     * You should implement the hashCode() so that two equal RecordId instances
-     * (with respect to equals()) have the same hashCode().
-     *
-     * @return An int that is the same for equal RecordId objects.
-     */
     @Override
     public int hashCode() {
-        // TODO: some code goes here
-        throw new UnsupportedOperationException("implement this");
-
+        return Objects.hash(pageId, tupleNo);
     }
-
 }

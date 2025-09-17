@@ -9,7 +9,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+
 
 /**
  * The Catalog keeps track of all available tables in the database and their
@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * For now, this is a stub catalog that must be populated with tables by a
  * user program before it can be used -- eventually, this should be converted
  * to a catalog that reads a catalog table from disk.
+ *数据库唯一目录,记录所有的表
  *
  * @Threadsafe
  */
@@ -28,7 +29,14 @@ public class Catalog {
      */
     public Catalog() {
         // TODO: some code goes here
+        nameMap=new HashMap<>();
+        idMap=new HashMap<>();
     }
+    //表名和id映射
+    Map<String,Integer> nameMap;
+    //id和表映射
+    Map<Integer,TableInfo> idMap;
+    //集合用来最基础的存放，map是索引
 
     /**
      * Add a new table to the catalog.
@@ -42,11 +50,16 @@ public class Catalog {
      */
     public void addTable(DbFile file, String name, String pkeyField) {
         // TODO: some code goes here
+        TableInfo tableInfo=new TableInfo(name,file,pkeyField);
+        idMap.put(file.getId(),tableInfo);
+        nameMap.put(name,file.getId());
+
     }
 
     public void addTable(DbFile file, String name) {
         addTable(file, name, "");
     }
+
 
     /**
      * Add a new table to the catalog.
@@ -66,8 +79,11 @@ public class Catalog {
      * @throws NoSuchElementException if the table doesn't exist
      */
     public int getTableId(String name) throws NoSuchElementException {
-        // TODO: some code goes here
-        return 0;
+        Integer id = nameMap.get(name);
+        if (id != null){
+            return id;  // 修复：返回实际的 id
+        }
+        throw new NoSuchElementException("Table " + name + " doesn't exist");
     }
 
     /**
@@ -79,7 +95,11 @@ public class Catalog {
      */
     public TupleDesc getTupleDesc(int tableid) throws NoSuchElementException {
         // TODO: some code goes here
-        return null;
+        TableInfo tableInfo = idMap.get(tableid);
+        if (tableInfo!=null){
+            return tableInfo.getDbFile().getTupleDesc();
+        }
+        throw new NoSuchElementException("Invalid ID");
     }
 
     /**
@@ -91,22 +111,34 @@ public class Catalog {
      */
     public DbFile getDatabaseFile(int tableid) throws NoSuchElementException {
         // TODO: some code goes here
-        return null;
+        TableInfo tableInfo = idMap.get(tableid);
+        if (tableInfo!=null){
+            return tableInfo.dbFile;
+        }
+        throw new NoSuchElementException("Invalid ID");
     }
 
     public String getPrimaryKey(int tableid) {
         // TODO: some code goes here
-        return null;
+        TableInfo tableInfo = idMap.get(tableid);
+        if (tableInfo!=null){
+            return tableInfo.pkeyField;
+        }
+        throw new NoSuchElementException("Invalid ID");
     }
 
     public Iterator<Integer> tableIdIterator() {
         // TODO: some code goes here
-        return null;
+        return idMap.keySet().iterator();
     }
 
     public String getTableName(int id) {
         // TODO: some code goes here
-        return null;
+        TableInfo tableInfo = idMap.get(id);
+        if (tableInfo!=null){
+            return tableInfo.tableName;
+        }
+        throw new NoSuchElementException("Invalid ID");
     }
 
     /**
@@ -114,6 +146,8 @@ public class Catalog {
      */
     public void clear() {
         // TODO: some code goes here
+        idMap.clear();
+        nameMap.clear();
     }
 
     /**

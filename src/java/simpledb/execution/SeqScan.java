@@ -3,9 +3,7 @@ package simpledb.execution;
 import simpledb.common.Database;
 import simpledb.common.DbException;
 import simpledb.common.Type;
-import simpledb.storage.DbFileIterator;
-import simpledb.storage.Tuple;
-import simpledb.storage.TupleDesc;
+import simpledb.storage.*;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
@@ -16,6 +14,7 @@ import java.util.NoSuchElementException;
  * each tuple of a table in no particular order (e.g., as they are laid out on
  * disk).
  */
+//顺序扫描吗，和heapfile里的iterator的区别
 public class SeqScan implements OpIterator {
 
     private static final long serialVersionUID = 1L;
@@ -33,8 +32,40 @@ public class SeqScan implements OpIterator {
      *                   are, but the resulting name can be null.fieldName,
      *                   tableAlias.null, or null.null).
      */
+
+    TransactionId transactionId;
+    int tableId;
+    String tableAlias;
+    //boolean isOpen =false;
+    DbFileIterator dbFileIterator;
+    TupleDesc tupleDesc;
     public SeqScan(TransactionId tid, int tableid, String tableAlias) {
         // TODO: some code goes here
+        this.transactionId=tid;
+        this.tableId=tableid;
+        this.tableAlias=tableAlias;
+        refreshTupleDesc();
+        getIterator();
+    }
+
+    private void refreshTupleDesc(){
+        TupleDesc tmp = Database.getCatalog().getTupleDesc(tableId);
+        int n=tmp.numFields();
+        Type[] types=new Type[n];
+        String[] names=new String[n];
+        for (int i = 0; i < n; i++) {
+            types[i]=tmp.getFieldType(i);
+            if (tmp.getFieldName(i)!=null){
+                names[i]=getAlias()+"."+tmp.getFieldName(i);
+            }
+        }
+        this.tupleDesc=new TupleDesc(types,names);
+    }
+    private void getIterator(){
+        DbFile dbFile = Database.getCatalog().getDatabaseFile(tableId);
+        if (dbFile instanceof HeapFile){
+            this.dbFileIterator = ((HeapFile) dbFile).iterator(transactionId);
+        }
     }
 
     /**
@@ -42,7 +73,7 @@ public class SeqScan implements OpIterator {
      *         be the actual name of the table in the catalog of the database
      */
     public String getTableName() {
-        return null;
+        return Database.getCatalog().getTableName(tableId);
     }
 
     /**
@@ -50,7 +81,7 @@ public class SeqScan implements OpIterator {
      */
     public String getAlias() {
         // TODO: some code goes here
-        return null;
+        return tableAlias;
     }
 
     /**
@@ -66,6 +97,10 @@ public class SeqScan implements OpIterator {
      */
     public void reset(int tableid, String tableAlias) {
         // TODO: some code goes here
+        this.tableId=tableid;
+        this.tableAlias=tableAlias;
+        getIterator();
+        refreshTupleDesc();
     }
 
     public SeqScan(TransactionId tid, int tableId) {
@@ -74,6 +109,8 @@ public class SeqScan implements OpIterator {
 
     public void open() throws DbException, TransactionAbortedException {
         // TODO: some code goes here
+        //isOpen =true;
+        dbFileIterator.open();
     }
 
     /**
@@ -88,26 +125,29 @@ public class SeqScan implements OpIterator {
      */
     public TupleDesc getTupleDesc() {
         // TODO: some code goes here
-        return null;
+        return tupleDesc;
     }
 
     public boolean hasNext() throws TransactionAbortedException, DbException {
         // TODO: some code goes here
-        return false;
+        return dbFileIterator.hasNext();
     }
 
     public Tuple next() throws NoSuchElementException,
             TransactionAbortedException, DbException {
         // TODO: some code goes here
-        return null;
+        return dbFileIterator.next();
     }
 
     public void close() {
         // TODO: some code goes here
+        //isOpen=false;
+        dbFileIterator.close();
     }
 
     public void rewind() throws DbException, NoSuchElementException,
             TransactionAbortedException {
         // TODO: some code goes here
+        dbFileIterator.rewind();
     }
 }

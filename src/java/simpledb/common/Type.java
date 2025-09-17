@@ -42,6 +42,8 @@ public enum Type implements Serializable {
                 int strLen = dis.readInt();
                 byte[] bs = new byte[strLen];
                 dis.read(bs);
+
+                //跳过未使用的位置
                 dis.skipBytes(STRING_LEN - strLen);
                 return new StringField(new String(bs), STRING_LEN);
             } catch (IOException e) {

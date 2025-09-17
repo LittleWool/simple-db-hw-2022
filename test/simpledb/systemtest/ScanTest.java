@@ -78,6 +78,7 @@ public class ScanTest extends SimpleDbTestBase {
      * @throws DbException */
     @Test public void testCache() throws IOException, DbException, TransactionAbortedException {
         /* Counts the number of successful `readPage()` calls. */
+
         class InstrumentedHeapFile extends HeapFile {
             public InstrumentedHeapFile(File f, TupleDesc td) {
                 super(f, td);
@@ -97,8 +98,10 @@ public class ScanTest extends SimpleDbTestBase {
         // Create the table
         final int PAGES = 30;
         List<List<Integer>> tuples = new ArrayList<>();
+        //创建992页数据
         File f = SystemTestUtil.createRandomHeapFileUnopened(1, 992*PAGES, 1000, null, tuples);
         TupleDesc td = Utility.getTupleDesc(1);
+
         InstrumentedHeapFile table = new InstrumentedHeapFile(f, td);
         Database.getCatalog().addTable(table, SystemTestUtil.getUUID());
 
