@@ -3,9 +3,11 @@ package simpledb.optimizer;
 import simpledb.ParsingException;
 import simpledb.common.Catalog;
 import simpledb.common.Database;
+import simpledb.common.DbException;
 import simpledb.common.Type;
 import simpledb.execution.*;
 import simpledb.storage.*;
+import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
 import java.io.File;
@@ -350,7 +352,8 @@ public class LogicalPlan {
                 throw new ParsingException("Unknown field in filter expression " + lf.fieldQuantifiedName);
             }
             if (ftyp == Type.INT_TYPE)
-                f = new IntField(new Integer(lf.c));
+//                f = new IntField(new Integer(lf.c));
+                f = new IntField(Integer.valueOf(lf.c));
             else
                 f = new StringField(lf.c, Type.STRING_LEN);
 

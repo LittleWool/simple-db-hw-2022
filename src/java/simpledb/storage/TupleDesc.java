@@ -224,30 +224,17 @@ public class TupleDesc implements Serializable {
         return new TupleDesc(types,names);
     }
 
-    /**
-     * Compares the specified object with this TupleDesc for equality. Two
-     * TupleDescs are considered equal if they have the same number of items
-     * and if the i-th type in this TupleDesc is equal to the i-th type in o
-     * for every i.
-     *
-     * @param o the Object to be compared for equality with this TupleDesc.
-     * @return true if the object is equal to this TupleDesc.
-     */
-
+    @Override
     public boolean equals(Object o) {
-        // TODO: some code goes here
         if (o == null || getClass() != o.getClass()) return false;
         TupleDesc tupleDesc = (TupleDesc) o;
         return Objects.equals(tdItemList, tupleDesc.tdItemList);
     }
 
+    @Override
     public int hashCode() {
-        // If you want to use TupleDesc as keys for HashMap, implement this so
-        // that equal objects have equals hashCode() results
         return Objects.hashCode(tdItemList);
-       // throw new UnsupportedOperationException("unimplemented");
     }
-
 
     /**
      * Returns a String describing this descriptor. It should be of the form

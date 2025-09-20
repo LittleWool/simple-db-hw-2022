@@ -2,11 +2,15 @@ package simpledb.execution;
 
 import simpledb.common.Database;
 import simpledb.common.DbException;
-import simpledb.storage.BufferPool;
-import simpledb.storage.Tuple;
-import simpledb.storage.TupleDesc;
+import simpledb.common.Type;
+import simpledb.storage.*;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
+
+import java.io.IOException;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 
 /**
  * Inserts tuples read from the child operator into the tableId specified in the
@@ -25,26 +29,61 @@ public class Insert extends Operator {
      * @throws DbException if TupleDesc of child differs from table into which we are to
      *                     insert.
      */
+    TransactionId t;
+    OpIterator child;
+    int tableId;
+    int count=0;
+    TupleDesc resTupleDesc;
+    List<Tuple> resTuples;
+    Iterator<Tuple> iterator;
+
     public Insert(TransactionId t, OpIterator child, int tableId)
             throws DbException {
         // TODO: some code goes here
+        this.t=t;
+        this.child=child;
+        this.tableId=tableId;
+        if (!child.getTupleDesc().equals(Database.getCatalog().getTupleDesc(tableId))){
+            throw new DbException("The operator type does not match");
+        }
+        resTupleDesc=new TupleDesc(new Type[]{Type.INT_TYPE});
+        resTuples=new LinkedList<>();
     }
 
     public TupleDesc getTupleDesc() {
         // TODO: some code goes here
-        return null;
+        return resTupleDesc;
     }
 
     public void open() throws DbException, TransactionAbortedException {
         // TODO: some code goes here
+        super.open();
+        child.open();
+        while (child.hasNext()){
+            Tuple tmp=child.next();
+            count++;
+            try {
+                Database.getBufferPool().insertTuple(t,tableId,tmp);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        Tuple tuple = new Tuple(resTupleDesc);
+        tuple.setField(0,new IntField(count));
+        resTuples.add(tuple);
+        iterator = resTuples.iterator();
     }
 
     public void close() {
         // TODO: some code goes here
+        super.close();
+        child.close();
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
         // TODO: some code goes here
+        child.rewind();
+        count=0;
     }
 
     /**
@@ -62,17 +101,21 @@ public class Insert extends Operator {
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
         // TODO: some code goes here
+        if (iterator!=null&&iterator.hasNext()){
+            return iterator.next();
+        }
         return null;
     }
 
     @Override
     public OpIterator[] getChildren() {
         // TODO: some code goes here
-        return null;
+        return new OpIterator[]{child};
     }
 
     @Override
     public void setChildren(OpIterator[] children) {
         // TODO: some code goes here
+        child=children[0];
     }
 }

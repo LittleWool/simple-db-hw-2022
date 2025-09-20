@@ -14,7 +14,7 @@ import java.util.NoSuchElementException;
  * each tuple of a table in no particular order (e.g., as they are laid out on
  * disk).
  */
-//顺序扫描吗，和heapfile里的iterator的区别
+
 public class SeqScan implements OpIterator {
 
     private static final long serialVersionUID = 1L;
@@ -26,51 +26,61 @@ public class SeqScan implements OpIterator {
      * @param tid        The transaction this scan is running as a part of.
      * @param tableid    the table to scan.
      * @param tableAlias the alias of this table (needed by the parser); the returned
-     *                   tupleDesc should have fields with name tableAlias.fieldName
-     *                   (note: this class is not responsible for handling a case where
-     *                   tableAlias or fieldName are null. It shouldn't crash if they
-     *                   are, but the resulting name can be null.fieldName,
-     *                   tableAlias.null, or null.null).
+     * tupleDesc should have fields with name tableAlias.fieldName
+     * (note: this class is not responsible for handling a case where
+     * tableAlias or fieldName are null. It shouldn't crash if they
+     * are, but the resulting name can be null.fieldName,
+     * tableAlias.null, or null.null).
      */
-
+    //事务id
     TransactionId transactionId;
+    //表id
     int tableId;
+    //表别名
     String tableAlias;
-    //boolean isOpen =false;
+
     DbFileIterator dbFileIterator;
+    //表模式描述
     TupleDesc tupleDesc;
+
     public SeqScan(TransactionId tid, int tableid, String tableAlias) {
         // TODO: some code goes here
-        this.transactionId=tid;
-        this.tableId=tableid;
-        this.tableAlias=tableAlias;
+        this.transactionId = tid;
+        this.tableId = tableid;
+        this.tableAlias = tableAlias;
         refreshTupleDesc();
         getIterator();
     }
 
-    private void refreshTupleDesc(){
+    private void refreshTupleDesc() {
         TupleDesc tmp = Database.getCatalog().getTupleDesc(tableId);
-        int n=tmp.numFields();
-        Type[] types=new Type[n];
-        String[] names=new String[n];
+        int n = tmp.numFields();
+        Type[] types = new Type[n];
+        String[] names = new String[n];
         for (int i = 0; i < n; i++) {
-            types[i]=tmp.getFieldType(i);
-            if (tmp.getFieldName(i)!=null){
-                names[i]=getAlias()+"."+tmp.getFieldName(i);
+            types[i] = tmp.getFieldType(i);
+            if (tmp.getFieldName(i) != null) {
+                String fieldName = tmp.getFieldName(i);
+                if (fieldName.equals("")){
+                    names[i] = fieldName;
+                }else {
+                    names[i] = getAlias() + "." + fieldName;
+                }
             }
         }
-        this.tupleDesc=new TupleDesc(types,names);
+        this.tupleDesc = new TupleDesc(types, names);
     }
-    private void getIterator(){
+
+    private void getIterator() {
         DbFile dbFile = Database.getCatalog().getDatabaseFile(tableId);
-        if (dbFile instanceof HeapFile){
+        if (dbFile instanceof HeapFile) {
             this.dbFileIterator = ((HeapFile) dbFile).iterator(transactionId);
         }
     }
 
     /**
      * @return return the table name of the table the operator scans. This should
-     *         be the actual name of the table in the catalog of the database
+     * be the actual name of the table in the catalog of the database
      */
     public String getTableName() {
         return Database.getCatalog().getTableName(tableId);
@@ -97,8 +107,8 @@ public class SeqScan implements OpIterator {
      */
     public void reset(int tableid, String tableAlias) {
         // TODO: some code goes here
-        this.tableId=tableid;
-        this.tableAlias=tableAlias;
+        this.tableId = tableid;
+        this.tableAlias = tableAlias;
         getIterator();
         refreshTupleDesc();
     }
@@ -109,7 +119,6 @@ public class SeqScan implements OpIterator {
 
     public void open() throws DbException, TransactionAbortedException {
         // TODO: some code goes here
-        //isOpen =true;
         dbFileIterator.open();
     }
 
@@ -121,7 +130,7 @@ public class SeqScan implements OpIterator {
      * (e.g., "alias.fieldName").
      *
      * @return the TupleDesc with field names from the underlying HeapFile,
-     *         prefixed with the tableAlias string from the constructor.
+     * prefixed with the tableAlias string from the constructor.
      */
     public TupleDesc getTupleDesc() {
         // TODO: some code goes here
@@ -141,7 +150,6 @@ public class SeqScan implements OpIterator {
 
     public void close() {
         // TODO: some code goes here
-        //isOpen=false;
         dbFileIterator.close();
     }
 

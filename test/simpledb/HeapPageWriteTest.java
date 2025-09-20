@@ -32,7 +32,7 @@ public class HeapPageWriteTest extends SimpleDbTestBase {
         this.pid = new HeapPageId(-1, -1);
         Database.getCatalog().addTable(new SkeletonFile(-1, Utility.getTupleDesc(2)), SystemTestUtil.getUUID());
     }
-    
+
     /**
      * Unit test for HeapPage.isDirty()
      */
@@ -94,7 +94,7 @@ public class HeapPageWriteTest extends SimpleDbTestBase {
      * Unit test for HeapPage.deleteTuple() with false tuples
      */
     @Test(expected=DbException.class)
-        public void deleteNonexistentTuple() throws Exception {
+    public void deleteNonexistentTuple() throws Exception {
         HeapPage page = new HeapPage(pid, HeapPageReadTest.EXAMPLE_DATA);
         page.deleteTuple(Utility.getHeapTuple(2, 2));
     }
@@ -138,4 +138,3 @@ public class HeapPageWriteTest extends SimpleDbTestBase {
         return new JUnit4TestAdapter(HeapPageWriteTest.class);
     }
 }
-

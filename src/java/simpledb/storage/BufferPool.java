@@ -32,13 +32,15 @@ public class BufferPool {
     private static int pageSize = DEFAULT_PAGE_SIZE;
 
     private HashMap<PageId,Page> map;
-
+    private LinkedList<Page> pages;
     /**
      * Default number of pages passed to the constructor. This is used by
      * other classes. BufferPool should use the numPages argument to the
      * constructor instead.
      */
     public static final int DEFAULT_PAGES = 50;
+
+    private int numPages=0;
 
     /**
      * Creates a BufferPool that caches up to numPages pages.
@@ -48,11 +50,14 @@ public class BufferPool {
     public BufferPool(int numPages) {
         // TODO: some code goes here
         map=new HashMap<>();
+        pages=new LinkedList<>();
+        this.numPages=numPages==0?DEFAULT_PAGES:numPages;
     }
 
     public static int getPageSize() {
         return pageSize;
     }
+
 
     // THIS FUNCTION SHOULD ONLY BE USED FOR TESTING!!
     public static void setPageSize(int pageSize) {
@@ -83,12 +88,20 @@ public class BufferPool {
             throws TransactionAbortedException, DbException {
         Page pg = map.get(pid);
         if(pg != null) return pg;
-        DbFile db = Database.getCatalog().getDatabaseFile(pid.getTableId());
-        pg = db.readPage(pid);
-        map.put(pid, pg);
+        pg=readPageInBf(pid);
         return pg;
     }
 
+    private Page readPageInBf(PageId pid) throws DbException {
+        DbFile db = Database.getCatalog().getDatabaseFile(pid.getTableId());
+        Page pg = db.readPage(pid);
+        if (pages.size()==numPages){
+            evictPage();
+        }
+        pages.add(pg);
+        map.put(pid, pg);
+        return pg;
+    }
     /**
      * Releases the lock on a page.
      * Calling this is very risky, and may result in wrong behavior. Think hard
@@ -152,6 +165,13 @@ public class BufferPool {
     public void insertTuple(TransactionId tid, int tableId, Tuple t)
             throws DbException, IOException, TransactionAbortedException {
         // TODO: some code goes here
+        DbFile databaseFile = Database.getCatalog().getDatabaseFile(tableId);
+        List<Page> pages = databaseFile.insertTuple(tid, t);
+        for (Page page : pages) {
+            page.markDirty(true,tid);
+            //本来把计入缓存放在HeapFile里了,结果测试过不去
+            map.put(page.getId(),page);
+        }
         // not necessary for lab1
     }
 
@@ -171,6 +191,14 @@ public class BufferPool {
     public void deleteTuple(TransactionId tid, Tuple t)
             throws DbException, IOException, TransactionAbortedException {
         // TODO: some code goes here
+        int tableId = t.recordId.getPageId().getTableId();
+        DbFile databaseFile = Database.getCatalog().getDatabaseFile(tableId);
+        List<Page> pages = databaseFile.deleteTuple(tid, t);
+        for (Page page : pages) {
+            page.markDirty(true,tid);
+            map.put(page.getId(),page);
+        }
+
         // not necessary for lab1
     }
 
@@ -182,6 +210,11 @@ public class BufferPool {
     public synchronized void flushAllPages() throws IOException {
         // TODO: some code goes here
         // not necessary for lab1
+        for (Map.Entry<PageId, Page> pageEntry : map.entrySet()) {
+            if (pageEntry.getValue().isDirty()!=null){
+                flushPage(pageEntry.getKey());
+            }
+        }
 
     }
 
@@ -194,9 +227,14 @@ public class BufferPool {
      * Also used by B+ tree files to ensure that deleted pages
      * are removed from the cache so they can be reused safely
      */
-    public synchronized void removePage(PageId pid) {
+    public synchronized void removePage(PageId pid)  {
         // TODO: some code goes here
         // not necessary for lab1
+        Page page = map.get(pid);
+        if (page==null){
+            return;
+        }
+        map.remove(page.getId());
     }
 
     /**
@@ -207,6 +245,13 @@ public class BufferPool {
     private synchronized void flushPage(PageId pid) throws IOException {
         // TODO: some code goes here
         // not necessary for lab1
+        Page page = map.get(pid);
+        if (page!=null){
+            Database.getCatalog().getDatabaseFile(pid.getTableId()).writePage(page);
+            page.markDirty(false,null);
+        }
+
+
     }
 
     /**
@@ -224,6 +269,8 @@ public class BufferPool {
     private synchronized void evictPage() throws DbException {
         // TODO: some code goes here
         // not necessary for lab1
+        Page removeFirst = pages.removeFirst();
+        map.remove(removeFirst.getId());
     }
 
 }

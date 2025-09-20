@@ -7,6 +7,7 @@ import java.io.Serializable;
 
 /**
  * Predicate compares tuples to a specified Field value.
+ * 使用谓词对某个字段的值进行比较
  */
 public class Predicate implements Serializable {
 
@@ -48,6 +49,12 @@ public class Predicate implements Serializable {
 
     }
 
+    //比较的字段索引
+    int fieldIndex;
+    //用于比较的操作符
+    Op op;
+    //操作数
+    Field operand;
     /**
      * Constructor.
      *
@@ -57,6 +64,9 @@ public class Predicate implements Serializable {
      */
     public Predicate(int field, Op op, Field operand) {
         // TODO: some code goes here
+        this.fieldIndex =field;
+        this.op=op;
+        this.operand =operand;
     }
 
     /**
@@ -64,7 +74,7 @@ public class Predicate implements Serializable {
      */
     public int getField() {
         // TODO: some code goes here
-        return -1;
+        return fieldIndex;
     }
 
     /**
@@ -72,7 +82,7 @@ public class Predicate implements Serializable {
      */
     public Op getOp() {
         // TODO: some code goes here
-        return null;
+        return op;
     }
 
     /**
@@ -80,7 +90,7 @@ public class Predicate implements Serializable {
      */
     public Field getOperand() {
         // TODO: some code goes here
-        return null;
+        return operand;
     }
 
     /**
@@ -94,7 +104,10 @@ public class Predicate implements Serializable {
      */
     public boolean filter(Tuple t) {
         // TODO: some code goes here
-        return false;
+        if (t.getField(this.fieldIndex).getType()!=this.operand.getType()){
+            return false;
+        }
+        return t.getField(this.fieldIndex).compare(this.op,this.operand);
     }
 
     /**
@@ -103,6 +116,6 @@ public class Predicate implements Serializable {
      */
     public String toString() {
         // TODO: some code goes here
-        return "";
+        return "f = "+this.fieldIndex+"\top = "+op.toString()+"\toperand = "+operand;
     }
 }

@@ -94,7 +94,7 @@ public class FilterTest extends SimpleDbTestBase {
     Filter op = new Filter(pred, scan);
     op.open();
     assertTrue(TestUtil.compareTuples(Utility.getHeapTuple(-5, testWidth),
-        op.next()));
+            op.next()));
     op.close();
 
     this.scan = new TestUtil.MockScan(-5, 5, testWidth);
@@ -102,7 +102,7 @@ public class FilterTest extends SimpleDbTestBase {
     op = new Filter(pred, scan);
     op.open();
     assertTrue(TestUtil.compareTuples(Utility.getHeapTuple(0, testWidth),
-        op.next()));
+            op.next()));
     op.close();
 
     this.scan = new TestUtil.MockScan(-5, 5, testWidth);
@@ -110,7 +110,7 @@ public class FilterTest extends SimpleDbTestBase {
     op = new Filter(pred, scan);
     op.open();
     assertTrue(TestUtil.compareTuples(Utility.getHeapTuple(4, testWidth),
-        op.next()));
+            op.next()));
     op.close();
   }
 
@@ -133,4 +133,3 @@ public class FilterTest extends SimpleDbTestBase {
     return new JUnit4TestAdapter(FilterTest.class);
   }
 }
-
