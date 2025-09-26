@@ -3,9 +3,9 @@ package simpledb.optimizer;
 import simpledb.ParsingException;
 import simpledb.common.Database;
 import simpledb.execution.*;
-import simpledb.storage.TupleDesc;
 
 import javax.swing.*;
+import javax.swing.text.Keymap;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import java.util.*;
@@ -14,6 +14,7 @@ import java.util.*;
  * The JoinOptimizer class is responsible for ordering a series of joins
  * optimally, and for selecting the best instantiation of a join for a given
  * logical plan.
+ * 以最佳方式对一系列连接进行排序，并为给定的逻辑计划选择连接的最佳实例化。
  */
 public class JoinOptimizer {
     final LogicalPlan p;
@@ -96,6 +97,7 @@ public class JoinOptimizer {
      */
     public double estimateJoinCost(LogicalJoinNode j, int card1, int card2,
                                    double cost1, double cost2) {
+        //card表示tuple元组数量,cost则是扫描全表代价
         if (j instanceof LogicalSubplanJoinNode) {
             // A LogicalSubplanJoinNode represents a subquery.
             // You do not need to implement proper support for these for Lab 3.
@@ -105,7 +107,7 @@ public class JoinOptimizer {
             // HINT: You may need to use the variable "j" if you implemented
             // a join algorithm that's more complicated than a basic
             // nested-loops join.
-            return -1.0;
+            return cost1+card1*cost2+card1*cost2;
         }
     }
 
@@ -137,6 +139,7 @@ public class JoinOptimizer {
 
     /**
      * Estimate the join cardinality of two tables.
+     * 估算连接基数
      */
     public static int estimateTableJoinCardinality(Predicate.Op joinOp,
                                                    String table1Alias, String table2Alias, String field1PureName,
@@ -145,7 +148,51 @@ public class JoinOptimizer {
                                                    Map<String, Integer> tableAliasToId) {
         int card = 1;
         // TODO: some code goes here
+        Integer id1 = tableAliasToId.get(table1Alias);
+        Integer id2 = tableAliasToId.get(table2Alias);
+        TableStats tableStats1 = stats.get(Database.getCatalog().getTableName(id1));
+        TableStats tableStats2 = stats.get(Database.getCatalog().getTableName(id2));
+        //两个统计信息拿到
+        int scanCost1 = tableStats1.scanCost;
+        int scanCost2 = tableStats2.scanCost;
+        if (joinOp.equals(Predicate.Op.EQUALS)){
+            if (t1pkey&&t2pkey){
+                card=Math.min(card1,card2);
+            }else if (t1pkey){
+                card=card2;
+            }else if (t2pkey){
+                card=card1;
+            }else{
+                //这只是一个保守的估计并不是一个最悲观的笛卡尔积估计
+                card=Math.max(card1,card2);
+
+            }
+        }else{
+            card=(int)(card1*card2*0.4);
+        }
+
+
         return card <= 0 ? 1 : card;
+    }
+
+    private HashMap<Integer,LinkedList<Set<LogicalJoinNode>>> getAllSubsets(List<LogicalJoinNode> list){
+        HashMap<Integer,LinkedList<Set<LogicalJoinNode>>> res=new HashMap<>(((1<<list.size())-1));
+        int len=list.size();
+        //跳过什么节点都不选的组合
+        for (int i = 1; i <(1<<len) ; i++) {
+            Set<LogicalJoinNode> tmp=new HashSet<>();
+            int count=0;
+            for (int j = 0; j < len; j++) {
+                if ((((1<<j)&i)!=0)){
+                    tmp.add(list.get(j));
+                    count++;
+                }
+            }
+            LinkedList<Set<LogicalJoinNode>> setLinkedList = res.getOrDefault(count, new LinkedList<Set<LogicalJoinNode>>());
+            setLinkedList.add(tmp);
+            res.put(count,setLinkedList);
+        }
+        return res;
     }
 
     /**
@@ -199,9 +246,39 @@ public class JoinOptimizer {
             Map<String, Double> filterSelectivities, boolean explain)
             throws ParsingException {
         // Not necessary for labs 1 and 2.
-
         // TODO: some code goes here
-        return joins;
+
+        // 初始化计划缓存，用于存储已计算的子问题结果
+        PlanCache pc = new PlanCache();
+        HashMap<Integer, LinkedList<Set<LogicalJoinNode>>> allSubsets = getAllSubsets(joins);
+        // 对于每个可能的连接集合大小（从1到总连接数）
+        int len=joins.size();
+        for (int i = 1; i <= len; i++) {
+            LinkedList<Set<LogicalJoinNode>> setLinkedList = allSubsets.get(i);
+            for (Set<LogicalJoinNode> logicalJoinNodes : setLinkedList) {
+                double bestCost=Double.MAX_VALUE;
+                CostCard bestPlan = null;
+                for (LogicalJoinNode logicalJoinNode : logicalJoinNodes) {
+                    CostCard costCard = computeCostAndCardOfSubplan(stats, filterSelectivities, logicalJoinNode, logicalJoinNodes, bestCost, pc);
+                    if (costCard!=null&&costCard.cost<bestCost){
+                        bestCost=costCard.cost;
+                        bestPlan = costCard;
+                    }
+                }
+                if(bestPlan!=null){
+                    pc.addPlan(logicalJoinNodes,bestPlan.cost,bestPlan.card,bestPlan.plan);
+                }
+            }
+        }
+        // 获取最终的最优连接顺序
+        List<LogicalJoinNode> result = pc.getOrder(new HashSet<>(joins));
+
+
+        if (explain) {
+            printJoins(result, pc, stats, filterSelectivities);
+        }
+
+        return result;
     }
 
     // ===================== Private Methods =================================
