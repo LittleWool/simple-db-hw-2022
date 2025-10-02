@@ -1,9 +1,11 @@
 package simpledb.storage;
 
+import com.sun.source.tree.ReturnTree;
 import simpledb.common.Database;
 import simpledb.common.DbException;
 import simpledb.common.DeadlockException;
 import simpledb.common.Permissions;
+import simpledb.transaction.LockManager;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
@@ -31,7 +33,7 @@ public class BufferPool {
 
     private static int pageSize = DEFAULT_PAGE_SIZE;
 
-    private HashMap<PageId,Page> map;
+    private HashMap<PageId, Page> map;
     private LinkedList<Page> pages;
     /**
      * Default number of pages passed to the constructor. This is used by
@@ -40,7 +42,8 @@ public class BufferPool {
      */
     public static final int DEFAULT_PAGES = 50;
 
-    private int numPages=0;
+    private int numPages = 0;
+    LockManager lockManager = new LockManager();
 
     /**
      * Creates a BufferPool that caches up to numPages pages.
@@ -49,9 +52,9 @@ public class BufferPool {
      */
     public BufferPool(int numPages) {
         // TODO: some code goes here
-        map=new HashMap<>();
-        pages=new LinkedList<>();
-        this.numPages=numPages==0?DEFAULT_PAGES:numPages;
+        map = new HashMap<>();
+        pages = new LinkedList<>();
+        this.numPages = numPages == 0 ? DEFAULT_PAGES : numPages;
     }
 
     public static int getPageSize() {
@@ -84,24 +87,31 @@ public class BufferPool {
      * @param pid  the ID of the requested page
      * @param perm the requested permissions on the page
      */
-    public  Page getPage(TransactionId tid, PageId pid, Permissions perm)
+    public Page getPage(TransactionId tid, PageId pid, Permissions perm)
             throws TransactionAbortedException, DbException {
-        Page pg = map.get(pid);
-        if(pg != null) return pg;
-        pg=readPageInBf(pid);
-        return pg;
+        final int timeout = new Random().nextInt(2000) + 1000;
+        boolean lockSuccess = lockManager.tryAcquireLock(tid, pid, perm, timeout);
+        if (lockSuccess) {
+            Page pg = map.get(pid);
+            if (pg != null) return pg;
+            pg = readPageInBf(pid);
+            return pg;
+        } else {
+            throw new TransactionAbortedException();
+        }
     }
 
     private Page readPageInBf(PageId pid) throws DbException {
         DbFile db = Database.getCatalog().getDatabaseFile(pid.getTableId());
         Page pg = db.readPage(pid);
-        if (pages.size()==numPages){
+        if (pages.size() == numPages) {
             evictPage();
         }
         pages.add(pg);
         map.put(pid, pg);
         return pg;
     }
+
     /**
      * Releases the lock on a page.
      * Calling this is very risky, and may result in wrong behavior. Think hard
@@ -114,6 +124,17 @@ public class BufferPool {
     public void unsafeReleasePage(TransactionId tid, PageId pid) {
         // TODO: some code goes here
         // not necessary for lab1|lab2
+        lockManager.tryReleaseLock(tid, pid, 5000);
+    }
+
+
+    /**
+     * Return true if the specified transaction has a lock on the specified page
+     */
+    public boolean holdsLock(TransactionId tid, PageId p) {
+        // TODO: some code goes here
+        // not necessary for lab1|lab2
+        return lockManager.holdsLock(tid, p);
     }
 
     /**
@@ -124,15 +145,7 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid) {
         // TODO: some code goes here
         // not necessary for lab1|lab2
-    }
-
-    /**
-     * Return true if the specified transaction has a lock on the specified page
-     */
-    public boolean holdsLock(TransactionId tid, PageId p) {
-        // TODO: some code goes here
-        // not necessary for lab1|lab2
-        return false;
+        transactionComplete(tid, true);
     }
 
     /**
@@ -145,7 +158,45 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid, boolean commit) {
         // TODO: some code goes here
         // not necessary for lab1|lab2
+        if (commit) {
+            try {
+                flushPages(tid);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        } else {
+            try {
+                rollBackPages(tid);
+            } catch (DbException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        Set<PageId> pageIds = lockManager.getTransactionLocks().get(tid);
+        if (pageIds != null) {
+            // 创建副本避免并发修改异常
+            Set<PageId> pageIdsCopy = new HashSet<>(pageIds);
+            for (PageId pageId : pageIdsCopy) {
+                unsafeReleasePage(tid, pageId);
+            }
+        }
+
     }
+
+    private void rollBackPages(TransactionId tid) throws DbException {
+        Set<PageId> pageIds = lockManager.getTransactionLocks().get(tid);
+        if (pageIds != null) {
+            // 创建副本避免并发修改异常
+            Set<PageId> pageIdsCopy = new HashSet<>(pageIds);
+            for (PageId pageId : pageIdsCopy) {
+                removePage(pageId);
+            }
+
+            for (PageId pageId : pageIdsCopy) {
+                readPageInBf(pageId);
+            }
+        }
+    }
+
 
     /**
      * Add a tuple to the specified table on behalf of transaction tid.  Will
@@ -168,9 +219,9 @@ public class BufferPool {
         DbFile databaseFile = Database.getCatalog().getDatabaseFile(tableId);
         List<Page> pages = databaseFile.insertTuple(tid, t);
         for (Page page : pages) {
-            page.markDirty(true,tid);
+            page.markDirty(true, tid);
             //本来把计入缓存放在HeapFile里了,结果测试过不去
-            map.put(page.getId(),page);
+            map.put(page.getId(), page);
         }
         // not necessary for lab1
     }
@@ -195,8 +246,8 @@ public class BufferPool {
         DbFile databaseFile = Database.getCatalog().getDatabaseFile(tableId);
         List<Page> pages = databaseFile.deleteTuple(tid, t);
         for (Page page : pages) {
-            page.markDirty(true,tid);
-            map.put(page.getId(),page);
+            page.markDirty(true, tid);
+            map.put(page.getId(), page);
         }
 
         // not necessary for lab1
@@ -211,7 +262,7 @@ public class BufferPool {
         // TODO: some code goes here
         // not necessary for lab1
         for (Map.Entry<PageId, Page> pageEntry : map.entrySet()) {
-            if (pageEntry.getValue().isDirty()!=null){
+            if (pageEntry.getValue().isDirty() != null) {
                 flushPage(pageEntry.getKey());
             }
         }
@@ -227,14 +278,17 @@ public class BufferPool {
      * Also used by B+ tree files to ensure that deleted pages
      * are removed from the cache so they can be reused safely
      */
-    public synchronized void removePage(PageId pid)  {
+    public synchronized void removePage(PageId pid) {
         // TODO: some code goes here
         // not necessary for lab1
         Page page = map.get(pid);
-        if (page==null){
+        if (page == null) {
             return;
         }
+        // 从map中移除
         map.remove(page.getId());
+        // 从pages列表中移除
+        pages.remove(page);
     }
 
     /**
@@ -246,9 +300,9 @@ public class BufferPool {
         // TODO: some code goes here
         // not necessary for lab1
         Page page = map.get(pid);
-        if (page!=null){
+        if (page != null) {
             Database.getCatalog().getDatabaseFile(pid.getTableId()).writePage(page);
-            page.markDirty(false,null);
+            page.markDirty(false, null);
         }
 
 
@@ -260,6 +314,12 @@ public class BufferPool {
     public synchronized void flushPages(TransactionId tid) throws IOException {
         // TODO: some code goes here
         // not necessary for lab1|lab2
+        Set<PageId> pageIds = lockManager.getTransactionLocks().get(tid);
+        if (pageIds != null && !pageIds.isEmpty()) {
+            for (PageId pageId : pageIds) {
+                flushPage(pageId);
+            }
+        }
     }
 
     /**
@@ -267,10 +327,20 @@ public class BufferPool {
      * Flushes the page to disk to ensure dirty pages are updated on disk.
      */
     private synchronized void evictPage() throws DbException {
-        // TODO: some code goes here
-        // not necessary for lab1
-        Page removeFirst = pages.removeFirst();
-        map.remove(removeFirst.getId());
+        // 实现 NO STEAL 策略：不驱逐脏页面
+        // 遍历页面列表，找到第一个非脏页面进行驱逐
+        Iterator<Page> iterator = pages.iterator();
+        while (iterator.hasNext()) {
+            Page page = iterator.next();
+            if (page.isDirty() == null) {  // 非脏页面
+                iterator.remove();
+                map.remove(page.getId());
+                return;
+            }
+        }
+
+        // 如果所有页面都是脏页面，则抛出异常
+        throw new DbException("All pages are dirty, cannot evict any page under NO STEAL policy");
     }
 
 }

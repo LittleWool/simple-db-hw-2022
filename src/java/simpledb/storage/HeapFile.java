@@ -152,7 +152,7 @@ public class HeapFile implements DbFile {
             //寻找空闲页面
             for (int i = 0; i < numPages(); i++) {
                 HeapPageId heapPageId = new HeapPageId(getId(), i);
-                HeapPage tmp = (HeapPage) getPageFromBufferPool(tid, heapPageId, null);
+                HeapPage tmp = (HeapPage) getPageFromBufferPool(tid, heapPageId, Permissions.READ_WRITE);
                 if (!tmp.freeSlots.isEmpty()){
                     page = tmp;
                     break;
@@ -167,7 +167,7 @@ public class HeapFile implements DbFile {
                 freeSet.add(heapPageId);
             }
         }
-        HeapPage page = (HeapPage) getPageFromBufferPool(tid, freeSet.iterator().next(), null);
+        HeapPage page = (HeapPage) getPageFromBufferPool(tid, freeSet.iterator().next(), Permissions.READ_WRITE);
 
 
         page.insertTuple(t);
@@ -186,7 +186,7 @@ public class HeapFile implements DbFile {
             TransactionAbortedException {
         // TODO: some code goes here
         RecordId recordId = t.recordId;
-        HeapPage page = (HeapPage) Database.getBufferPool().getPage(tid, recordId.pageId, null);
+        HeapPage page = (HeapPage) Database.getBufferPool().getPage(tid, recordId.pageId, Permissions.READ_WRITE);
         page.deleteTuple(t);
         if (!page.freeSlots.isEmpty()){
             freeSet.add(page.getId());
@@ -235,7 +235,7 @@ public class HeapFile implements DbFile {
         //读取新的页面，更换新的页面的迭代器
         private void loadPage() throws DbException, TransactionAbortedException {
             if (pageNo < numPages()) {
-                Page page = Database.getBufferPool().getPage(tid, new HeapPageId(taleId, pageNo++), null);
+                Page page = Database.getBufferPool().getPage(tid, new HeapPageId(taleId, pageNo++), Permissions.READ_WRITE);
                 if (page instanceof HeapPage) {
                     //this.heapPage = (HeapPage) page;
                     this.iterator = ((HeapPage) page).iterator();

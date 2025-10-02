@@ -319,9 +319,7 @@ public class HeapPage implements Page {
         int freeSlotIndex=freeSlots.remove(0);
         markSlotUsed(freeSlotIndex,true);
         t.recordId=new RecordId(getId(),freeSlotIndex);
-
         tuples[freeSlotIndex]=t;
-
     }
 
     /**
