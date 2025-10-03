@@ -356,19 +356,19 @@ public class BTreeFile implements DbFile {
         int maxEntries = page.getMaxEntries();
         List<BTreeEntry> moveList=new ArrayList<>(maxEntries/2);
         Iterator<BTreeEntry> entryReverseIterator = page.reverseIterator();
-        for (int i = 0; i < maxEntries / 2+1; i++) {
-            if (entryReverseIterator.hasNext()){
-                moveList.add(entryReverseIterator.next());
-            }
+        for (int i = 0; i < maxEntries / 2; i++) {
+            moveList.add(entryReverseIterator.next());
         }
+
         BTreeInternalPage newPage = (BTreeInternalPage)getEmptyPage(tid, dirtypages, BTreePageId.INTERNAL);
         for (int i = 0; i < maxEntries / 2; i++) {
             page.deleteKeyAndRightChild(moveList.get(i));
             newPage.insertEntry(moveList.get(i));
         }
-        BTreeEntry midEntry = moveList.get(moveList.size() - 1);
-        Field midEntryKey = midEntry.getKey();
+        BTreeEntry midEntry = entryReverseIterator.next();
+        page.deleteKeyAndRightChild(midEntry);
 
+        Field midEntryKey = midEntry.getKey();
         BTreeInternalPage parent = getParentWithEmptySlots(tid, dirtypages, page.getParentId(), field);
         parent.insertEntry(new BTreeEntry(midEntryKey,page.getId(),newPage.getId()));
 
