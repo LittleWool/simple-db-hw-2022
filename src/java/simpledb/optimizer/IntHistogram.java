@@ -43,9 +43,9 @@ public class IntHistogram {
         this.max = max;
         //最小间隔数为1，之前搞了个0没过去
         span = Math.max(1,(int)Math.ceil((double)(max - min + 1) / buckets));
-        if(this.span == 1) this.buckets = max - min + 1;
+        if(this.span == 1) this.buckets = max - min;
         else this.buckets = buckets;
-        count = new int[buckets];
+        count = new int[this.buckets];
     }
 
     private int bucketIndex(int v){
@@ -137,9 +137,14 @@ public class IntHistogram {
                 res=res/total;
                 break;
             }
+//            case LESS_THAN_OR_EQ:{
+//                res=preSum[bIndex]+(1.0*(offset)/span)*count[bIndex];
+//                res=res/total;
+//                break;
+//            }
             case LESS_THAN_OR_EQ:{
-                res=preSum[bIndex]+(1.0*(offset)/span)*count[bIndex];
-                res=res/total;
+                res = preSum[bIndex] + (1.0 * (offset + 1) / span) * count[bIndex];
+                res = res/total;
                 break;
             }
         }
