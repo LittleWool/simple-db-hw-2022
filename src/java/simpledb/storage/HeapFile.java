@@ -235,7 +235,7 @@ public class HeapFile implements DbFile {
         //读取新的页面，更换新的页面的迭代器
         private void loadPage() throws DbException, TransactionAbortedException {
             if (pageNo < numPages()) {
-                Page page = Database.getBufferPool().getPage(tid, new HeapPageId(taleId, pageNo++), Permissions.READ_WRITE);
+                Page page = Database.getBufferPool().getPage(tid, new HeapPageId(taleId, pageNo++), Permissions.READ_ONLY);
                 if (page instanceof HeapPage) {
                     //this.heapPage = (HeapPage) page;
                     this.iterator = ((HeapPage) page).iterator();
