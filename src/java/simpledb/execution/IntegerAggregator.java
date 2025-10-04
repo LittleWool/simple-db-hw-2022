@@ -165,7 +165,9 @@ public class IntegerAggregator implements Aggregator {
                     value=entry.getValue().count;
                     break;
             }
-            tmp.setField(1,new IntField(value));
+            int fieldIndex = (gbFieldtype != null) ? 1 : 0;
+            tmp.setField(fieldIndex, new IntField(value));
+
             tuples.add(tmp);
         }
 

@@ -158,6 +158,7 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid, boolean commit) {
         // TODO: some code goes here
         // not necessary for lab1|lab2
+
         if (commit) {
             try {
                 flushPages(tid);
@@ -171,14 +172,14 @@ public class BufferPool {
                 throw new RuntimeException(e);
             }
         }
-        Set<PageId> pageIds = lockManager.getTransactionLocks().get(tid);
-        if (pageIds != null) {
-            // 创建副本避免并发修改异常
-            Set<PageId> pageIdsCopy = new HashSet<>(pageIds);
-            for (PageId pageId : pageIdsCopy) {
-                unsafeReleasePage(tid, pageId);
-            }
-        }
+        Set<PageId> pageIds = lockManager.releaseLocks(tid);
+//        if (pageIds != null) {
+//            // 创建副本避免并发修改异常
+//            Set<PageId> pageIdsCopy = new HashSet<>(pageIds);
+//            for (PageId pageId : pageIdsCopy) {
+//                unsafeReleasePage(tid, pageId);
+//            }
+//        }
 
     }
 

@@ -107,7 +107,7 @@ public class JoinOptimizer {
             // HINT: You may need to use the variable "j" if you implemented
             // a join algorithm that's more complicated than a basic
             // nested-loops join.
-            return cost1+card1*cost2+card1*cost2;
+            return cost1+card1*cost2+card1*card2;
         }
     }
 
@@ -148,13 +148,7 @@ public class JoinOptimizer {
                                                    Map<String, Integer> tableAliasToId) {
         int card = 1;
         // TODO: some code goes here
-        Integer id1 = tableAliasToId.get(table1Alias);
-        Integer id2 = tableAliasToId.get(table2Alias);
-        TableStats tableStats1 = stats.get(Database.getCatalog().getTableName(id1));
-        TableStats tableStats2 = stats.get(Database.getCatalog().getTableName(id2));
-        //两个统计信息拿到
-        int scanCost1 = tableStats1.scanCost;
-        int scanCost2 = tableStats2.scanCost;
+
         if (joinOp.equals(Predicate.Op.EQUALS)){
             if (t1pkey&&t2pkey){
                 card=Math.min(card1,card2);
@@ -168,32 +162,11 @@ public class JoinOptimizer {
 
             }
         }else{
-            card=(int)(card1*card2*0.4);
+            card=(int)(card1*card2*0.3);
         }
-
-
         return card <= 0 ? 1 : card;
     }
 
-    private HashMap<Integer,LinkedList<Set<LogicalJoinNode>>> getAllSubsets(List<LogicalJoinNode> list){
-        HashMap<Integer,LinkedList<Set<LogicalJoinNode>>> res=new HashMap<>(((1<<list.size())-1));
-        int len=list.size();
-        //跳过什么节点都不选的组合
-        for (int i = 1; i <(1<<len) ; i++) {
-            Set<LogicalJoinNode> tmp=new HashSet<>();
-            int count=0;
-            for (int j = 0; j < len; j++) {
-                if ((((1<<j)&i)!=0)){
-                    tmp.add(list.get(j));
-                    count++;
-                }
-            }
-            LinkedList<Set<LogicalJoinNode>> setLinkedList = res.getOrDefault(count, new LinkedList<Set<LogicalJoinNode>>());
-            setLinkedList.add(tmp);
-            res.put(count,setLinkedList);
-        }
-        return res;
-    }
 
     /**
      * Helper method to enumerate all of the subsets of a given size of a
@@ -224,6 +197,25 @@ public class JoinOptimizer {
         return els;
 
     }
+    private HashMap<Integer,LinkedList<Set<LogicalJoinNode>>> getAllSubsets(List<LogicalJoinNode> list){
+        HashMap<Integer,LinkedList<Set<LogicalJoinNode>>> res=new HashMap<>(((1<<list.size())));
+        int len=list.size();
+        //跳过什么节点都不选的组合
+        for (int i = 1; i <(1<<len) ; i++) {
+            Set<LogicalJoinNode> tmp=new HashSet<>();
+            int count=0;
+            for (int j = 0; j < len; j++) {
+                int num = i >> j & 1;
+                if (num == 1) {
+                    count ++; tmp.add(list.get(j));
+                }
+            }
+            LinkedList<Set<LogicalJoinNode>> setLinkedList = res.getOrDefault(count, new LinkedList<Set<LogicalJoinNode>>());
+            setLinkedList.add(tmp);
+            res.put(count,setLinkedList);
+        }
+        return res;
+    }
 
     /**
      * Compute a logical, reasonably efficient join on the specified tables. See
@@ -248,37 +240,43 @@ public class JoinOptimizer {
         // Not necessary for labs 1 and 2.
         // TODO: some code goes here
 
-        // 初始化计划缓存，用于存储已计算的子问题结果
         PlanCache pc = new PlanCache();
         HashMap<Integer, LinkedList<Set<LogicalJoinNode>>> allSubsets = getAllSubsets(joins);
+
         // 对于每个可能的连接集合大小（从1到总连接数）
-        int len=joins.size();
+        int len = joins.size();
         for (int i = 1; i <= len; i++) {
             LinkedList<Set<LogicalJoinNode>> setLinkedList = allSubsets.get(i);
             for (Set<LogicalJoinNode> logicalJoinNodes : setLinkedList) {
-                double bestCost=Double.MAX_VALUE;
+                double bestCost = Double.MAX_VALUE;
                 CostCard bestPlan = null;
+
+                // 对于当前子集中的每个连接节点，计算将其作为最后连接的成本
                 for (LogicalJoinNode logicalJoinNode : logicalJoinNodes) {
-                    CostCard costCard = computeCostAndCardOfSubplan(stats, filterSelectivities, logicalJoinNode, logicalJoinNodes, bestCost, pc);
-                    if (costCard!=null&&costCard.cost<bestCost){
-                        bestCost=costCard.cost;
+                    CostCard costCard = computeCostAndCardOfSubplan(
+                            stats, filterSelectivities, logicalJoinNode, logicalJoinNodes, bestCost, pc);
+
+                    if (costCard != null && costCard.cost < bestCost) {
+                        bestCost = costCard.cost;
                         bestPlan = costCard;
                     }
                 }
-                if(bestPlan!=null){
-                    pc.addPlan(logicalJoinNodes,bestPlan.cost,bestPlan.card,bestPlan.plan);
+
+                // 将最优计划添加到缓存中
+                if (bestPlan != null) {
+                    pc.addPlan(logicalJoinNodes, bestPlan.cost, bestPlan.card, bestPlan.plan);
                 }
             }
         }
-        // 获取最终的最优连接顺序
-        List<LogicalJoinNode> result = pc.getOrder(new HashSet<>(joins));
 
+        // 从PlanCache中获取最终的最优连接顺序
+        List<LogicalJoinNode> result = pc.getOrder(new HashSet<>(joins));
 
         if (explain) {
             printJoins(result, pc, stats, filterSelectivities);
         }
 
-        return result;
+        return result != null ? result : new ArrayList<>();
     }
 
     // ===================== Private Methods =================================

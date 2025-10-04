@@ -26,6 +26,28 @@ public class LockManager {
 
     }
 
+    public Set<PageId> releaseLocks(TransactionId tid) {
+        Set<PageId> releasedPages = new HashSet<>();
+        Set<PageId> lockedPages = transactionLocks.get(tid);
+
+        if (lockedPages != null) {
+            // 创建副本避免并发修改异常
+            Set<PageId> pagesCopy = new HashSet<>(lockedPages);
+            for (PageId pid : pagesCopy) {
+                if (releaseLock(tid, pid)) {
+                    releasedPages.add(pid);
+                }
+            }
+        }
+
+        // 从事务锁映射中移除该事务
+        transactionLocks.remove(tid);
+        // 移除等待图中的相关边
+        removeWaitEdge(tid);
+
+        return releasedPages;
+    }
+
 
     public static class PageLock {
         private PageId pageId;

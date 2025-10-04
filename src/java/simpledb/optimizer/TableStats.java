@@ -122,8 +122,6 @@ public class TableStats {
                     each.add(new StringHistogram(10));
                 }
             }
-
-            i=0;
             dbFileIterator.rewind();
             while (dbFileIterator.hasNext()) {
                 Tuple next = dbFileIterator.next();
